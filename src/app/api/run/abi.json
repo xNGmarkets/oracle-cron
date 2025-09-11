@@ -1,0 +1,351 @@
+[
+    {
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "maxStaleness_",
+          "type": "uint64"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "midE6",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "widthBps",
+          "type": "uint32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "ts",
+          "type": "uint64"
+        }
+      ],
+      "name": "BandSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "seconds_",
+          "type": "uint64"
+        }
+      ],
+      "name": "MaxStalenessSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnerSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "priceE6",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "seq",
+          "type": "uint64"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "ts",
+          "type": "uint64"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "hcsMsgId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "PriceSet",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "asset",
+          "type": "address"
+        }
+      ],
+      "name": "getBand",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "midE6",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint32",
+              "name": "widthBps",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "ts",
+              "type": "uint64"
+            }
+          ],
+          "internalType": "struct IOracleHub.BandPayload",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "asset",
+          "type": "address"
+        }
+      ],
+      "name": "getPrice",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "priceE6",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint64",
+              "name": "seq",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "ts",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "hcsMsgId",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct IOracleHub.PricePayload",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "maxStaleness",
+      "outputs": [
+        {
+          "internalType": "uint64",
+          "name": "",
+          "type": "uint64"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "midE6",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint32",
+              "name": "widthBps",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "ts",
+              "type": "uint64"
+            }
+          ],
+          "internalType": "struct IOracleHub.BandPayload",
+          "name": "b",
+          "type": "tuple"
+        }
+      ],
+      "name": "setBand",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "s",
+          "type": "uint64"
+        }
+      ],
+      "name": "setMaxStaleness",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "priceE6",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint64",
+              "name": "seq",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "ts",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "hcsMsgId",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct IOracleHub.PricePayload",
+          "name": "p",
+          "type": "tuple"
+        }
+      ],
+      "name": "setPrice",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address[]",
+          "name": "assets",
+          "type": "address[]"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "priceE6",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint64",
+              "name": "seq",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "ts",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "hcsMsgId",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct IOracleHub.PricePayload[]",
+          "name": "ps",
+          "type": "tuple[]"
+        }
+      ],
+      "name": "setPrices",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ]

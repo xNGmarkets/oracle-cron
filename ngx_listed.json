@@ -1,0 +1,98 @@
+[
+  {
+    "ticker": "AIICO",
+    "code": "AIICO",
+    "price": 4.2,
+    "day_change_pct": 0.05,
+    "ytd_pct": 1.9371,
+    "date": "10/09"
+  },
+  {
+    "ticker": "CORNERST",
+    "code": "CORNERST",
+    "price": 7.08,
+    "day_change_pct": -0.055999999999999994,
+    "ytd_pct": 0.9667,
+    "date": "10/09"
+  },
+  {
+    "ticker": "DANGSUGAR",
+    "code": "DANGSUGAR",
+    "price": 60,
+    "day_change_pct": null,
+    "ytd_pct": 0.8462000000000001,
+    "date": "10/09"
+  },
+  {
+    "ticker": "NESTLE",
+    "code": "NESTLE",
+    "price": 1870,
+    "day_change_pct": null,
+    "ytd_pct": 1.1371,
+    "date": "10/09"
+  },
+  {
+    "ticker": "OKOMUOIL",
+    "code": "OKOMUOIL",
+    "price": 1020,
+    "day_change_pct": null,
+    "ytd_pct": 1.2973,
+    "date": "10/09"
+  },
+  {
+    "ticker": "PRESCO",
+    "code": "PRESCO",
+    "price": 1480,
+    "day_change_pct": null,
+    "ytd_pct": 2.1158,
+    "date": "10/09"
+  },
+  {
+    "ticker": "TOTAL",
+    "code": "TOTALNG",
+    "price": 640,
+    "day_change_pct": null,
+    "ytd_pct": -0.08310000000000001,
+    "date": "10/09"
+  },
+  {
+    "ticker": "UBA",
+    "code": "UBA",
+    "price": 46.95,
+    "day_change_pct": 0.0043,
+    "ytd_pct": 0.3809,
+    "date": "09/09"
+  },
+  {
+    "ticker": "ZENITH",
+    "code": "ZENITHBANK",
+    "price": 66,
+    "day_change_pct": 0.0038,
+    "ytd_pct": 0.45049999999999996,
+    "date": "09/09"
+  },
+  {
+    "ticker": "MTNN",
+    "code": "MTNN",
+    "price": 435,
+    "day_change_pct": null,
+    "ytd_pct": 1.175,
+    "date": "09/09"
+  },
+  {
+    "ticker": "GTCO",
+    "code": "GTCO",
+    "price": 92.5,
+    "day_change_pct": 0.0054,
+    "ytd_pct": 0.6228,
+    "date": "09/09"
+  },
+  {
+    "ticker": "ARADEL",
+    "code": "ARADEL",
+    "price": 511.2,
+    "day_change_pct": null,
+    "ytd_pct": -0.1452,
+    "date": "09/09"
+  }
+]
