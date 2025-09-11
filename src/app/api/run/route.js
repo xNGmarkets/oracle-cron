@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 import OracleHubAbi from "./abi.json";
 const axios = require("axios");
 const cheerio = require("cheerio");
-const fs = require("fs");
 
+// ---- Config ----
 const TARGETS = {
   MTNN: "MTNN",
   UBA: "UBA",
@@ -19,12 +19,15 @@ const TARGETS = {
   NESTLE: "NESTLE",
   DANGSUGAR: "DANGSUGAR",
 };
-
 const TARGET_SET = new Set(Object.values(TARGETS));
 const URL =
   "https://african-markets.com/en/stock-markets/ngse/listed-companies";
+const DEFAULT_BAND_WIDTH_BPS = Number.parseInt(
+  process.env.BAND_WIDTH_BPS || "150",
+  10
+);
 
-// Helpers
+// ---- Helpers ----
 const toNumber = (txt) => {
   if (!txt) return null;
   const clean = txt.replace(/[, ]+/g, "").trim();
@@ -53,13 +56,14 @@ const extractCode = (href) => {
   }
 };
 
+// ---- Route ----
 export async function GET() {
   try {
+    // RPC + wallet
     const rpcUrl = process.env.RPC_URL || "https://testnet.hashio.io/api";
     const chainId = process.env.CHAIN_ID
       ? parseInt(process.env.CHAIN_ID, 10)
       : 296;
-
     const privateKey = process.env.PRIVATE_KEY;
     if (!privateKey) throw new Error("Private key missing");
 
@@ -94,11 +98,16 @@ export async function GET() {
       })
       .first();
 
-    if (!$table) throw new Error("Could not locate listings table");
+    if (!$table || $table.length === 0)
+      throw new Error("Could not locate listings table");
 
     const rows = [];
-    const assets = [];
-    const payloads = [];
+    // payloads for price + band
+    const priceAssets = [];
+    const pricePayloads = [];
+
+    const bandAssets = [];
+    const bandPayloads = [];
 
     $table.find("tbody tr").each((_, tr) => {
       const $td = $(tr).find("td");
@@ -109,7 +118,6 @@ export async function GET() {
       const price = toNumber($td.eq(2).text().trim());
       const day = parsePercent($td.eq(3).text().trim());
       const ytd = parsePercent($td.eq(4).text().trim());
-
       if (price == null) return;
 
       // ENV should have: MTNN=0x..., ZENITHBANK=0x..., TOTALNG=0x..., etc.
@@ -119,34 +127,86 @@ export async function GET() {
         return;
       }
 
-      assets.push(assetAddress);
-
       const now = Math.floor(Date.now() / 1000);
+      const pxE6 = BigInt(Math.round(price * 1e6));
 
-      payloads.push({
-        priceE6: BigInt(Math.round(price * 1e6)),
-        seq: BigInt(now), // use timestamp as seq
+      // price arrays
+      priceAssets.push(assetAddress);
+      pricePayloads.push({
+        priceE6: pxE6,
+        seq: BigInt(now), // simple monotonic seq for MVP
         ts: now,
-        hcsMsgId: "0x0000000000000000000000000000000000000000000000000000000000000000",
+        hcsMsgId:
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+      });
+
+      // band arrays (mid = price, width = env/default BPS)
+      bandAssets.push(assetAddress);
+      bandPayloads.push({
+        midE6: pxE6,
+        widthBps: DEFAULT_BAND_WIDTH_BPS,
+        ts: now,
       });
 
       rows.push({ ticker: code, price, day, ytd });
     });
 
     console.table(rows);
-    console.log(assets, payloads);
+    console.log("Price assets:", priceAssets.length);
+    console.log("Band assets:", bandAssets.length);
 
-    // --- SEND TO ORACLE ---
-    if (assets.length > 0) {
-      const tx = await oracleHub.setPrices(assets, payloads);
-      await tx.wait();
-      console.log("Oracle updated, tx:", tx.hash);
+    // --- SEND TO ORACLE: prices ---
+    let priceTxHash = null;
+    if (priceAssets.length > 0) {
+      const tx = await oracleHub.setPrices(priceAssets, pricePayloads);
+      const rec = await tx.wait();
+      priceTxHash = tx.hash;
+      console.log("setPrices OK:", priceTxHash, "status:", rec.status);
     } else {
       console.warn("No prices to update");
     }
 
+    // --- SEND TO ORACLE: bands ---
+    let bandTxHash = null;
+    if (bandAssets.length > 0) {
+      // Prefer bulk setBands; fallback to per-asset setBand if ABI/contract lacks it
+      if (typeof oracleHub.setBands === "function") {
+        try {
+          const txb = await oracleHub.setBands(bandAssets, bandPayloads);
+          const r = await txb.wait();
+          bandTxHash = txb.hash;
+          console.log("setBands OK:", bandTxHash, "status:", r.status);
+        } catch (e) {
+          console.warn("setBands failed, falling back to setBand loop:", e?.message || e);
+          for (let i = 0; i < bandAssets.length; i++) {
+            const tx1 = await oracleHub.setBand(bandAssets[i], bandPayloads[i]);
+            const r1 = await tx1.wait();
+            console.log(`setBand ${i + 1}/${bandAssets.length} hash=${tx1.hash} status=${r1.status}`);
+            bandTxHash = tx1.hash;
+          }
+        }
+      } else {
+        console.warn("ABI has no setBands; using setBand loop");
+        for (let i = 0; i < bandAssets.length; i++) {
+          const tx1 = await oracleHub.setBand(bandAssets[i], bandPayloads[i]);
+          const r1 = await tx1.wait();
+          console.log(`setBand ${i + 1}/${bandAssets.length} hash=${tx1.hash} status=${r1.status}`);
+          bandTxHash = tx1.hash;
+        }
+      }
+    } else {
+      console.warn("No bands to update");
+    }
+
     return NextResponse.json(
-      { success: true, count: assets.length },
+      {
+        success: true,
+        pricesUpdated: priceAssets.length,
+        bandsUpdated: bandAssets.length,
+        priceTxHash,
+        bandTxHash,
+        bandWidthBps: DEFAULT_BAND_WIDTH_BPS,
+      },
       { status: 200 }
     );
   } catch (err) {
