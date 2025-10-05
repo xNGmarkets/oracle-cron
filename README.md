@@ -1,1 +1,3 @@
-# xNG Oracle JOB
+# xNG Oracle Cron
+
+Runs `*/5 * * * *`
