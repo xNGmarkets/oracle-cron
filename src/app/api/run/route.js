@@ -56,6 +56,8 @@ const extractCode = (href) => {
   }
 };
 
+const now = Math.floor(Date.now() / 1000);
+
 // ---- Route ----
 export async function GET() {
   try {
@@ -127,7 +129,6 @@ export async function GET() {
         return;
       }
 
-      const now = Math.floor(Date.now() / 1000);
       const pxE6 = BigInt(Math.round(price * 1e6));
 
       // price arrays
@@ -152,8 +153,9 @@ export async function GET() {
     });
 
     console.table(rows);
-    console.log("Price assets:", priceAssets.length);
-    console.log("Band assets:", bandAssets.length);
+    console.log("Price assets:", priceAssets);
+    console.log("Band assets:", bandAssets);
+    console.log("Band payloads:", bandPayloads);
 
     // --- SEND TO ORACLE: prices ---
     let priceTxHash = null;
@@ -177,11 +179,18 @@ export async function GET() {
           bandTxHash = txb.hash;
           console.log("setBands OK:", bandTxHash, "status:", r.status);
         } catch (e) {
-          console.warn("setBands failed, falling back to setBand loop:", e?.message || e);
+          console.warn(
+            "setBands failed, falling back to setBand loop:",
+            e?.message || e
+          );
           for (let i = 0; i < bandAssets.length; i++) {
             const tx1 = await oracleHub.setBand(bandAssets[i], bandPayloads[i]);
             const r1 = await tx1.wait();
-            console.log(`setBand ${i + 1}/${bandAssets.length} hash=${tx1.hash} status=${r1.status}`);
+            console.log(
+              `setBand ${i + 1}/${bandAssets.length} hash=${tx1.hash} status=${
+                r1.status
+              }`
+            );
             bandTxHash = tx1.hash;
           }
         }
@@ -190,12 +199,66 @@ export async function GET() {
         for (let i = 0; i < bandAssets.length; i++) {
           const tx1 = await oracleHub.setBand(bandAssets[i], bandPayloads[i]);
           const r1 = await tx1.wait();
-          console.log(`setBand ${i + 1}/${bandAssets.length} hash=${tx1.hash} status=${r1.status}`);
+          console.log(
+            `setBand ${i + 1}/${bandAssets.length} hash=${tx1.hash} status=${
+              r1.status
+            }`
+          );
           bandTxHash = tx1.hash;
         }
       }
     } else {
       console.warn("No bands to update");
+    }
+
+    try {
+      const r = await fetch(
+        "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest?CMC_PRO_API_KEY=4875743b-bb4e-4671-8ba4-b8d38ad861fe&symbol=cNGN"
+      );
+      let rate = 1500; // Set default rate so Oracle doesnt fail
+
+      console.log(r.status, typeof r.status);
+      console.log(r.ok, typeof r.ok);
+
+      if (r.status == 200) {
+        const body = await r.json();
+        const price = body?.data["CNGN"]?.[0]?.quote?.["USD"]?.price;
+
+        if (price > 0) {
+          rate = Number(1 / price).toFixed(2);
+
+          console.log(`1 USD = ${rate} NGN`);
+        }
+      }
+
+      const ngnAsset = "0x00000000000000000000000000000000006a1e8c";
+      const rateE6 = rate * 1e6;
+      const bandLoad = {
+        midE6: rateE6,
+        widthBps: DEFAULT_BAND_WIDTH_BPS,
+        ts: now,
+      };
+      const priceLoad = {
+        priceE6: rateE6,
+        seq: BigInt(now),
+        ts: now,
+        hcsMsgId:
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+      };
+
+      const tx3 = await oracleHub.setPrice(ngnAsset, priceLoad);
+      const r3 = await tx3.wait();
+
+      console.log(`setPrice cNGN ${ngnAsset} hash=${tx3.hash} status=${r3.status}`);
+
+      const tx4 = await oracleHub.setBand(ngnAsset, bandLoad);
+      const r4 = await tx4.wait();
+
+      console.log(`setBand cNGN ${ngnAsset} hash=${tx4.hash} status=${r4.status}`);
+      bandTxHash = tx4.hash;
+    } catch (error) {
+      console.log("Cannot update");
+      console.log(error);
     }
 
     return NextResponse.json(
