@@ -56,9 +56,17 @@ const extractCode = (href) => {
   }
 };
 
-const now = Math.floor(Date.now() / 1000);
+// Get a fresh timestamp each request. Prefer chain time with wall-clock fallback.
+async function nowSec(provider) {
+  try {
+    const b = await provider.getBlock("latest");
+    if (b && b.timestamp) return BigInt(b.timestamp);
+  } catch (e) {
+    /* ignore */
+  }
+  return BigInt(Math.floor(Date.now() / 1000));
+}
 
-// ---- Route ----
 export async function GET() {
   try {
     // RPC + wallet
@@ -104,12 +112,13 @@ export async function GET() {
       throw new Error("Could not locate listings table");
 
     const rows = [];
-    // payloads for price + band
     const priceAssets = [];
     const pricePayloads = [];
-
     const bandAssets = [];
     const bandPayloads = [];
+
+    // fresh ts (BigInt) for this request
+    const ts = await nowSec(provider);
 
     $table.find("tbody tr").each((_, tr) => {
       const $td = $(tr).find("td");
@@ -122,40 +131,36 @@ export async function GET() {
       const ytd = parsePercent($td.eq(4).text().trim());
       if (price == null) return;
 
-      // ENV should have: MTNN=0x..., ZENITHBANK=0x..., TOTALNG=0x..., etc.
       const assetAddress = process.env[code];
       if (!assetAddress) {
         console.warn(`No address configured for ${code}`);
         return;
       }
 
-      const pxE6 = BigInt(Math.round(price * 1e6));
+      const pxE6 = BigInt(Math.round(price * 1e6)); // NGN * 1e6
 
-      // price arrays
       priceAssets.push(assetAddress);
       pricePayloads.push({
         priceE6: pxE6,
-        seq: BigInt(now), // simple monotonic seq for MVP
-        ts: now,
+        seq: ts, // simple monotonic per batch
+        ts: ts, // fresh ts
         hcsMsgId:
           "0x0000000000000000000000000000000000000000000000000000000000000000",
       });
 
-      // band arrays (mid = price, width = env/default BPS)
       bandAssets.push(assetAddress);
       bandPayloads.push({
         midE6: pxE6,
         widthBps: DEFAULT_BAND_WIDTH_BPS,
-        ts: now,
+        ts: ts, // fresh ts
       });
 
       rows.push({ ticker: code, price, day, ytd });
     });
 
     console.table(rows);
-    console.log("Price assets:", priceAssets);
-    console.log("Band assets:", bandAssets);
-    console.log("Band payloads:", bandPayloads);
+    console.log("Price assets:", priceAssets.length);
+    console.log("Band assets:", bandAssets.length);
 
     // --- SEND TO ORACLE: prices ---
     let priceTxHash = null;
@@ -171,7 +176,6 @@ export async function GET() {
     // --- SEND TO ORACLE: bands ---
     let bandTxHash = null;
     if (bandAssets.length > 0) {
-      // Prefer bulk setBands; fallback to per-asset setBand if ABI/contract lacks it
       if (typeof oracleHub.setBands === "function") {
         try {
           const txb = await oracleHub.setBands(bandAssets, bandPayloads);
@@ -211,54 +215,73 @@ export async function GET() {
       console.warn("No bands to update");
     }
 
+    // ---- FX / NGN-per-USD update (optional but recommended) ----
     try {
+      const tsFx = await nowSec(provider); // fresh ts for FX too
+
       const r = await fetch(
         "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest?CMC_PRO_API_KEY=4875743b-bb4e-4671-8ba4-b8d38ad861fe&symbol=cNGN"
       );
-      let rate = 1500; // Set default rate so Oracle doesnt fail
 
-      console.log(r.status, typeof r.status);
-      console.log(r.ok, typeof r.ok);
-
-      if (r.status == 200) {
+      let rateNum = 1500; // default NGN per USD
+      if (r.status === 200) {
         const body = await r.json();
-        const price = body?.data["CNGN"]?.[0]?.quote?.["USD"]?.price;
-
-        if (price > 0) {
-          rate = Number(1 / price).toFixed(2);
-
-          console.log(`1 USD = ${rate} NGN`);
+        const priceUSD = body?.data?.["CNGN"]?.[0]?.quote?.["USD"]?.price;
+        if (priceUSD > 0) {
+          rateNum = Number(1 / priceUSD);
+          rateNum = Math.round(rateNum * 1e2) / 1e2; // 2dp for stability
+          console.log(`1 USD ≈ ${rateNum} NGN`);
         }
+      } else {
+        console.warn(
+          `CMC response ${r.status} — using fallback ${rateNum} NGN`
+        );
       }
 
-      const ngnAsset = "0x00000000000000000000000000000000006a1e8c";
-      const rateE6 = rate * 1e6;
+      const ngnAsset = "0x00000000000000000000000000000000006a1e8c"; // your xNG-NGN oracle asset
+      const rateE6 = BigInt(Math.round(rateNum * 1e6));
+
       const bandLoad = {
         midE6: rateE6,
         widthBps: DEFAULT_BAND_WIDTH_BPS,
-        ts: now,
+        ts: tsFx,
       };
       const priceLoad = {
         priceE6: rateE6,
-        seq: BigInt(now),
-        ts: now,
+        seq: tsFx,
+        ts: tsFx,
         hcsMsgId:
           "0x0000000000000000000000000000000000000000000000000000000000000000",
       };
 
       const tx3 = await oracleHub.setPrice(ngnAsset, priceLoad);
       const r3 = await tx3.wait();
-
-      console.log(`setPrice cNGN ${ngnAsset} hash=${tx3.hash} status=${r3.status}`);
+      console.log(
+        `setPrice FX ${ngnAsset} hash=${tx3.hash} status=${r3.status}`
+      );
 
       const tx4 = await oracleHub.setBand(ngnAsset, bandLoad);
       const r4 = await tx4.wait();
-
-      console.log(`setBand cNGN ${ngnAsset} hash=${tx4.hash} status=${r4.status}`);
+      console.log(
+        `setBand  FX ${ngnAsset} hash=${tx4.hash} status=${r4.status}`
+      );
       bandTxHash = tx4.hash;
     } catch (error) {
-      console.log("Cannot update");
-      console.log(error);
+      console.warn("FX update failed (will not block equity bands):");
+      console.warn(error);
+    }
+
+    // Optional: quick freshness audit
+    try {
+      const maxStale = await oracleHub.maxStaleness(); // uint64
+      const nowChain = await nowSec(provider);
+      for (const a of bandAssets) {
+        const b = await oracleHub.getBand(a);
+        const fresh = nowChain <= BigInt(b.ts) + BigInt(maxStale);
+        console.log(`Freshness ${a}: ts=${b.ts} fresh=${fresh}`);
+      }
+    } catch (e) {
+      /* optional */
     }
 
     return NextResponse.json(
